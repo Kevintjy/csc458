@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if [ $(uname -m) == 'x86_64' ]; then
+  ./sr_solution_amd64 $*
+else
+  ./sr_solution_i386 $*
+fi
+
