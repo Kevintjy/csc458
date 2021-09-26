@@ -16,8 +16,91 @@
   checking whether we should resend an request or destroy the arp request.
   See the comments in the header file for an idea of what it should look like.
 */
-void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
+/* 
+  This function gets called every second. For each request sent out, we keep
+  checking whether we should resend an request or destroy the arp request.
+  See the comments in the header file for an idea of what it should look like.
+*/
+void sr_arpcache_sweepreqs(struct sr_instance *sr)
+{
     /* Fill this in */
+    struct sr_arpreq *req = sr->cache.requests;
+    while (req)
+    {
+        /* Save next request since it may be destroyed by handle_arpreq */
+        struct sr_arpreq *next_req = req->next;
+        sr_handle_arpreq(sr, req);
+        req = next_req;
+    }
+}
+
+/*
+  This function is to handle the arp request in the request queue. Send the 
+  request to the next hop. Notify the original host that host unreachable 
+  if the request was sent more than 5 times. 
+*/
+void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req)
+{
+    if (difftime(time(NULL), req->sent) > 0.9)
+    {
+        /* Send ICMP host unreachable if sent 5 times.*/
+        if (req->times_sent >= 5)
+        {
+            /* Reverse the linked list */
+            sr_reverse_packets(req);
+            /* Iterate all incoming packets */
+            struct sr_packet *packet = req->packets;
+            while (packet)
+            {
+                /* Load related headers */
+                sr_ethernet_hdr_t *e_hdr = (sr_ethernet_hdr_t *)packet->buf;
+                sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet->buf + sizeof(sr_ethernet_hdr_t));
+
+                /* Get the interface we should use for reply */
+                char *interface = sr_get_longest_prefix_match(sr->routing_table, ip_hdr->ip_src);
+                struct sr_if *iface = sr_get_interface(sr, interface);
+
+                /* Generate and send ICMP type 3 code 1 packet */
+                sr_ethernet_hdr_t *e_hdr_new = sr_create_ethernet_header(e_hdr->ether_shost, iface->addr,
+                                                                         ethertype_ip);
+                sr_icmp_t3_hdr_t *icmp_hdr_new = sr_create_icmp_t3_t11_header(3, 1, ip_hdr);
+                sr_ip_hdr_t *ip_hdr_new = sr_create_ip_header(iface->ip, ip_hdr->ip_src, ip_hdr->ip_id, ip_protocol_icmp,
+                                                              sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
+                uint8_t *buf = sr_build_icmp_packet(e_hdr_new, ip_hdr_new, icmp_hdr_new, sizeof(sr_icmp_t3_hdr_t));
+                sr_send_packet(sr, buf, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t), interface);
+
+                free(interface);
+                free(buf);
+
+                packet = packet->next;
+            }
+            /* Free memory */
+            sr_arpreq_destroy(&(sr->cache), req);
+        }
+        /* Send ARP request for next hop. */
+        else
+        {
+            /* Prepare */
+            uint8_t broadcast_mac[ETHER_ADDR_LEN];
+            memset(broadcast_mac, 0xff, ETHER_ADDR_LEN);
+            uint8_t empty_mac[ETHER_ADDR_LEN];
+            memset(empty_mac, 0, ETHER_ADDR_LEN);
+            struct sr_if *iface = sr_get_interface(sr, req->packets->iface);
+
+            /* Send ARP request */
+            sr_ethernet_hdr_t *e_hdr_new = sr_create_ethernet_header(broadcast_mac, iface->addr,
+                                                                     ethertype_arp);
+            sr_arp_hdr_t *arp_hdr_new = sr_create_arp_header(arp_op_request, iface->addr, iface->ip,
+                                                             empty_mac, req->ip);
+            uint8_t *buf = sr_build_arp_packet(e_hdr_new, arp_hdr_new);
+            sr_send_packet(sr, buf, sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t), iface->name);
+            free(buf);
+
+            /* Update request struct */
+            req->sent = time(NULL);
+            req->times_sent++;
+        }
+    }
 }
 
 /* You should not need to touch the rest of this code. */
