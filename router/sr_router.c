@@ -155,26 +155,26 @@ void sr_handle_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len, str
     
     if (dest_interface == 0) { /* not find the destination interface */
       sr_forward_ip(sr, packet, len);
-      // ip_hdr->ip_ttl--;
-      // if (ip_hdr->ip_ttl == 0) {
-      //   sr_send_icmp(sr, packet, len, 11, 0);
-      //   return;
-      // }
-      // ip_hdr->ip_sum = 0;
-      // ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * 4);
+/*       ip_hdr->ip_ttl--;
+      if (ip_hdr->ip_ttl == 0) {
+        sr_send_icmp(sr, packet, len, 11, 0);
+        return;
+      }
+      ip_hdr->ip_sum = 0;
+      ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * 4);
       
       
-      // struct sr_rt *rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_dst);
+      struct sr_rt *rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_dst);
       
-      // if (!rt) {
-      //     sr_send_icmp(sr, packet, len, 3, 0);
-      //     return;
-      // }
+      if (!rt) {
+          sr_send_icmp(sr, packet, len, 3, 0);
+          return;
+      }
       
       
-      // struct sr_if *oiface = sr_get_interface(sr, rt->interface);
+      struct sr_if *oiface = sr_get_interface(sr, rt->interface);
       
-      // sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
+      sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr); */
     } else { /*  find the destination interface */
         if (ip_hdr->ip_p == ip_protocol_icmp) {
             sr_handle_icmp(sr, packet, len);
