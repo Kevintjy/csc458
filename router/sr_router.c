@@ -26,7 +26,6 @@
 static void sr_handle_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *iface);
 struct sr_if *sr_get_interface_from_addr(struct sr_instance *sr, const unsigned char *addr);
 struct sr_if *sr_get_interface_from_ip(struct sr_instance *sr, uint32_t ip_nbo);
-static void sr_handle_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len);
 static void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t icmp_type, uint8_t icmp_code);
 
 static void sr_lookup_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *oiface, uint32_t ip);
@@ -164,15 +163,22 @@ void sr_handle_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len, str
       struct sr_rt * rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_dst);
       
       if (!rt) {
-          sr_send_icmp(sr, packet, len, 3, 0);
+          printf("already send the icmp message, end");
           return;
       }
-      
       struct sr_if *oiface = sr_get_interface(sr, rt->interface);
       sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
     } else { /*  find the destination interface */
+        sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
         if (ip_hdr->ip_p == ip_protocol_icmp) {
-            sr_handle_icmp(sr, packet, len);
+          if (len < sizeof(sr_ethernet_hdr_t) + size(sr_ip_hdr_t)+ sizeof(sr_icmp_hdr_t)) {
+            fprintf(stderr, "Failed to process ICMP header, insufficient length\n");
+            return;
+          }
+          if (icmp_hdr->icmp_type == 8){ /* this is a icmp echo request */
+            sr_send_icmp(sr, packet, len, 0, 0);
+          }
+
         } else if (ip_hdr->ip_p == 0x0006 || ip_hdr->ip_p == 0x0011) {
             sr_send_icmp(sr, packet, len, 3, 3);
         }else{
@@ -181,36 +187,6 @@ void sr_handle_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len, str
     }
 }
 
-void sr_handle_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len)
-{
-    assert(sr);
-    assert(packet);
-    
-    sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
-    
-    
-    if (len < sizeof(sr_ethernet_hdr_t) + (ip_hdr->ip_hl * 4) + sizeof(sr_icmp_hdr_t)) {
-        fprintf(stderr, "Failed to process ICMP header, insufficient length\n");
-        return;
-    }
-    
-    sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + (ip_hdr->ip_hl * 4));
-
-    uint16_t received_cksum = icmp_hdr->icmp_sum;
-    icmp_hdr->icmp_sum = 0;
-    
-    uint16_t computed_cksum = cksum(icmp_hdr, ntohs(ip_hdr->ip_len) - (ip_hdr->ip_hl * 4));
-    icmp_hdr->icmp_sum = received_cksum;
-    
-    if (received_cksum != computed_cksum) {
-        fprintf(stderr, "Failed to process ICMP header, incorrect checksum\n");
-        return;
-    }
-    
-    if (icmp_hdr->icmp_type == 8 && icmp_hdr->icmp_code == 0) {
-        sr_send_icmp(sr, packet, len, 0, 0);
-    }
-} 
 
 void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t icmp_type, uint8_t icmp_code)
 {
@@ -219,7 +195,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
     
     sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
     sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
-    sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + (ip_hdr->ip_hl * 4));
+    sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
     
 
     struct sr_rt* rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_src);
@@ -556,6 +532,10 @@ struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip
       max_mask = mask;
     }
     rt_walker = rt_walker->next;
+  }
+  if (ret == NULL){
+    sr_send_icmp(sr, packet, len, 3, 0);
+    return NULL;
   }
   return ret; 
 }
