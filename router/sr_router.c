@@ -24,7 +24,6 @@
 #include "sr_utils.h"
 
 static void sr_handle_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *iface);
-static void sr_forward_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len);
 struct sr_if *sr_get_interface_from_addr(struct sr_instance *sr, const unsigned char *addr);
 struct sr_if *sr_get_interface_from_ip(struct sr_instance *sr, uint32_t ip_nbo);
 static void sr_handle_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len);
@@ -155,13 +154,12 @@ void sr_handle_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len, str
     
     if (dest_interface == 0) { /* not find the destination interface */
       if (--ip_hdr->ip_ttl == 0) {
-        sr_send_icmp(sr, packet, len, 11, 0);
+        sr_send_icmp(sr, packet, len, 11, 0); /* TTL=0 means time exceed */
         return;
       }
       /* recalculate the checksum */
       ip_hdr->ip_sum = 0;
       ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * 4);
-      
       
       struct sr_rt *rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_dst);
       
@@ -170,9 +168,8 @@ void sr_handle_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len, str
           return;
       }
       
-      
       struct sr_if *oiface = sr_get_interface(sr, rt->interface);
-      
+      free(rt);
       sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
     } else { /*  find the destination interface */
         if (ip_hdr->ip_p == ip_protocol_icmp) {
@@ -184,37 +181,6 @@ void sr_handle_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len, str
         }
     }
 }
-
-void sr_forward_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len)
-{
-    assert(sr);
-    assert(packet);
-    
-    sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
-    
-   
-    ip_hdr->ip_ttl--;
-    
-    if (ip_hdr->ip_ttl == 0) { /* time exceed */
-        sr_send_icmp(sr, packet, len, 11, 0);
-        return;
-    }
-    
-
-    ip_hdr->ip_sum = 0;
-    ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * 4);
-    
-    
-    struct sr_rt *rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_dst);
-    
-    if (!rt) {
-        sr_send_icmp(sr, packet, len, 3, 0);
-        return;
-    }
-    struct sr_if *oiface = sr_get_interface(sr, rt->interface);
-    
-    sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
-} 
 
 void sr_handle_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len)
 {
@@ -573,26 +539,41 @@ void sr_send_arp_request(struct sr_instance *sr, struct sr_if *oiface, uint32_t 
 
 struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip)
 {
-    struct sr_rt *rt_walker = 0;
-    struct sr_rt *prefix_match = 0;
-    uint32_t prefix_len = 0;
-    
-    assert(sr);
-    
-    rt_walker = sr->routing_table;
-    
-    while (rt_walker) {
-        if ((rt_walker->dest.s_addr & rt_walker->mask.s_addr) == (ip & rt_walker->mask.s_addr)) {
-            if (prefix_len <= rt_walker->mask.s_addr) {
-                prefix_match = rt_walker;
-                prefix_len = rt_walker->mask.s_addr;
-            }
-        }
-        
-        rt_walker = rt_walker->next;
+  ip = ntohl(ip);
+  char *interface = malloc(sr_IFACE_NAMELEN);
+  interface[0] = '\0';
+  int max_match = 0;
+  struct sr_rt *entry = sr;
+
+  /* Iterate all entries in the routing table */
+  while (entry != NULL)
+  {
+    int curr_match = 0;
+    uint32_t entry_ip = ntohl(entry->dest.s_addr);
+
+    /* Split IP address into 4 parts */
+    int i;
+    for (i = 0; i < 4; i++)
+    {
+      int ip1 = entry_ip << 8 * i >> 24;
+      int ip2 = ip << 8 * i >> 24;
+      if (ip1 == ip2)
+        curr_match++;
+      else
+        break;
     }
-    
-    return prefix_match;
+    if (curr_match > max_match)
+    {
+      max_match = curr_match;
+      strncpy(interface, entry->interface, sr_IFACE_NAMELEN);
+    }
+    entry = entry->next;
+  }
+
+  /* Return NULL if no match */
+  if (max_match == 0)
+    return NULL;
+  return interface; /* need to free*/
 }
 
 struct sr_if *sr_get_interface_from_addr(struct sr_instance *sr, const unsigned char *addr)
