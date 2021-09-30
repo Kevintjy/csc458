@@ -559,12 +559,6 @@ struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip
     }
     
     return prefix_match;
-  }
-
-  /* Return NULL if no match */
-  if (max_match == 0)
-    return NULL;
-  return interface; /* need to free*/
 }
 
 struct sr_if *sr_get_interface_from_addr(struct sr_instance *sr, const unsigned char *addr)
