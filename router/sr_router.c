@@ -63,6 +63,24 @@ void sr_init(struct sr_instance* sr)
     /* Add initialization code here! */
 } /* -- sr_init -- */
 
+/* get the interface from ip */
+struct sr_if *sr_get_interface_from_ip(struct sr_instance *sr, uint32_t ip)
+{
+    struct sr_if* if_walker = 0;
+
+    if_walker = sr->if_list;
+
+    while(if_walker)
+    {
+      if(if_walker->ip == ip){
+        return if_walker; 
+      }
+      if_walker = if_walker->next;
+    }
+
+    return 0;
+} 
+
 /*---------------------------------------------------------------------
  * Method: sr_handlepacket(uint8_t* p,char* interface)
  * Scope:  Global
@@ -91,61 +109,72 @@ void sr_handlepacket(struct sr_instance* sr,
 
   printf("*** -> Received packet of length %d \n",len);
 
-    /* check length */
+    /* check minimum length */
     if (len < sizeof(sr_ethernet_hdr_t)) {
-        fprintf(stderr, "Failed to process ETHERNET header, insufficient length\n");
+        fprintf(stderr, "Ethernet header is too short\n");
         return;
     }
     
     sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
-    
-    uint16_t ether_type = ntohs(eth_hdr->ether_type);
     struct sr_if *iface = sr_get_interface(sr, interface);
     
-    if (ether_type == ethertype_ip) {
+    if (ethertype(packet) == ethertype_ip) { /* handle IP packet*/
         sr_handle_ip(sr, packet, len, iface);
-    } else if (ether_type == ethertype_arp) {
+    } else if (ethertype(packet) == ethertype_arp) { /* handle ARP packet*/
         sr_handle_arp(sr, packet, len, iface);
+    }else{
+        fprintf(stderr, "Unknown ethertype\n")
     }
 }
 
 void sr_handle_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *iface)
 {
-    assert(sr);
-    assert(packet);
-    assert(iface);
-    
-    
+    /* check the length */
     if (len < sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)) {
-        fprintf(stderr, "Failed to process IP header, insufficient length\n");
+        fprintf(stderr, "IP header is too short\n");
         return;
     }
-    
+
+    sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
     sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
     
-    
-    if (len < sizeof(sr_ethernet_hdr_t) + (ip_hdr->ip_hl * 4)) {
-        fprintf(stderr, "Failed to process IP header, insufficient length\n");
-        return;
-    }
-    
     /* verify checksum */
-    uint16_t received_cksum = ip_hdr->ip_sum;
-    ip_hdr->ip_sum = 0;
-    
-    uint16_t computed_cksum = cksum(ip_hdr, ip_hdr->ip_hl * 4);
-    ip_hdr->ip_sum = received_cksum;
-    
-    if (received_cksum != computed_cksum) {
-        fprintf(stderr, "Failed to process IP header, incorrect checksum\n");
+    if (cksum(ip_hdr, ip_hdr->ip_hl * 4) != 0xffff)
+    {
+      fprintf(stderr, "checksum does not match\n");
+      return;
+    }
+
+    /* check the IP version */
+    if(ip_hdr->ip_v != 4) {
+        fprintf(stderr, "IP is not IPV4\n");
         return;
     }
      
-    struct sr_if *diface = sr_get_interface_from_ip(sr, ip_hdr->ip_dst);
+    struct sr_if *dest_interface = sr_get_interface_from_ip(sr, ip_hdr->ip_dst);
     
-    if (!diface) {
-        sr_forward_ip(sr, packet, len);
-    } else {
+    if (dest_interface != 0) { /* find the destination interface */
+      ip_hdr->ip_ttl--;
+      if (ip_hdr->ip_ttl == 0) {
+        sr_send_icmp(sr, packet, len, 11, 0);
+        return;
+      }
+      ip_hdr->ip_sum = 0;
+      ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * 4);
+      
+      
+      struct sr_rt *rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_dst);
+      
+      if (!rt) {
+          sr_send_icmp(sr, packet, len, 3, 0);
+          return;
+      }
+      
+      
+      struct sr_if *oiface = sr_get_interface(sr, rt->interface);
+      
+      sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
+    } else { /* not find the destination interface */
         if (ip_hdr->ip_p == ip_protocol_icmp) {
             sr_handle_icmp(sr, packet, len);
         } else if (ip_hdr->ip_p == 0x0006 || ip_hdr->ip_p == 0x0011) {
@@ -164,7 +193,7 @@ void sr_forward_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len)
    
     ip_hdr->ip_ttl--;
     
-    if (ip_hdr->ip_ttl == 0) {
+    if (ip_hdr->ip_ttl == 0) { /* time exceed */
         sr_send_icmp(sr, packet, len, 11, 0);
         return;
     }
@@ -180,8 +209,6 @@ void sr_forward_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len)
         sr_send_icmp(sr, packet, len, 3, 0);
         return;
     }
-    
-    
     struct sr_if *oiface = sr_get_interface(sr, rt->interface);
     
     sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
@@ -586,30 +613,3 @@ struct sr_if *sr_get_interface_from_addr(struct sr_instance *sr, const unsigned 
     return 0;
 } /* -- sr_get_interface_from_addr -- */
 
-/*---------------------------------------------------------------------
- * Method: sr_get_interface_from_ip
- * Scope: Global
- *
- * Given an IP address return the interface record or 0 if it doesn't
- * exist.
- *
- *---------------------------------------------------------------------*/
-
-struct sr_if *sr_get_interface_from_ip(struct sr_instance *sr, uint32_t ip_nbo)
-{
-    struct sr_if *if_walker = 0;
-    
-    assert(sr);
-    
-    if_walker = sr->if_list;
-    
-    while (if_walker) {
-        if (if_walker->ip == ip_nbo) {
-            return if_walker;
-        }
-        
-        if_walker = if_walker->next;
-    }
-    
-    return 0;
-} /* -- sr_get_interface_from_ip -- */
