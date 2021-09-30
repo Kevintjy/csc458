@@ -549,7 +549,7 @@ struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip
   while (rt_walker != NULL) {
     mask = rt_walker->mask.s_addr;
     dest = rt_walker->dest.s_addr;
-    temp = ip_dst_add & mask;
+    temp = ip & mask;
     dest = dest & mask;
     if(temp == dest && mask > max_mask){
       ret = rt_walker;
