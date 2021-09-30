@@ -169,7 +169,7 @@ void sr_handle_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len, str
       }
       
       struct sr_if *oiface = sr_get_interface(sr, new_interface);
-      sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
+      sr_lookup_and_send(sr, packet, len, oiface, oiface->gw.s_addr);
     } else { /*  find the destination interface */
         if (ip_hdr->ip_p == ip_protocol_icmp) {
             sr_handle_icmp(sr, packet, len);
@@ -247,7 +247,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         icmp_hdr->icmp_sum = 0;
         icmp_hdr->icmp_sum = cksum(icmp_hdr, ntohs(ip_hdr->ip_len) - (ip_hdr->ip_hl * 4));
        
-        sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
+        sr_lookup_and_send(sr, packet, len, oiface, oiface->gw.s_addr);
     } else if (icmp_type == 3) {
         unsigned int new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
         uint8_t *buf = (uint8_t *)malloc(new_len);
