@@ -538,7 +538,27 @@ void sr_send_arp_request(struct sr_instance *sr, struct sr_if *oiface, uint32_t 
 
 struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip)
 {
-  struct sr_rt* rt_walker = sr->routing_table;
+      struct sr_rt *rt_walker = 0;
+    struct sr_rt *prefix_match = 0;
+    uint32_t prefix_len = 0;
+    
+    assert(sr);
+    
+    rt_walker = sr->routing_table;
+    
+    while (rt_walker) {
+        if ((rt_walker->dest.s_addr & rt_walker->mask.s_addr) == (ip & rt_walker->mask.s_addr)) {
+            if (prefix_len <= rt_walker->mask.s_addr) {
+                prefix_match = rt_walker;
+                prefix_len = rt_walker->mask.s_addr;
+            }
+        }
+        
+        rt_walker = rt_walker->next;
+    }
+    
+    return prefix_match;
+/*   struct sr_rt* rt_walker = sr->routing_table;
   
   uint32_t max_mask = 0;
   uint32_t mask = 0;
@@ -557,7 +577,7 @@ struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip
     }
     rt_walker = rt_walker->next;
   }
-  return ret;
+  return ret; */
 }
 
 struct sr_if *sr_get_interface_from_addr(struct sr_instance *sr, const unsigned char *addr)
