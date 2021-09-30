@@ -538,26 +538,43 @@ void sr_send_arp_request(struct sr_instance *sr, struct sr_if *oiface, uint32_t 
 
 struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip)
 {
-    struct sr_rt *rt_walker = 0;
-    struct sr_rt *prefix_match = 0;
-    uint32_t prefix_len = 0;
-    
-    assert(sr);
-    
-    rt_walker = sr->routing_table;
-    
-    while (rt_walker) {
-        if ((rt_walker->dest.s_addr & rt_walker->mask.s_addr) == (ip & rt_walker->mask.s_addr)) {
-            if (prefix_len <= rt_walker->mask.s_addr) {
-                prefix_match = rt_walker;
-                prefix_len = rt_walker->mask.s_addr;
-            }
-        }
-        
-        rt_walker = rt_walker->next;
+  ip = ntohl(ip);
+  char *interface = malloc(sr_IFACE_NAMELEN);
+  interface[0] = '\0';
+  int max_match = 0;
+  struct sr_rt *entry = routing_table;
+  struct sr_rt *max_entry = NULL;
+
+  /* Iterate all entries in the routing table */
+  while (entry != NULL)
+  {
+    int curr_match = 0;
+    uint32_t entry_ip = ntohl(entry->dest.s_addr);
+
+    /* Split IP address into 4 parts */
+    int i;
+    for (i = 0; i < 4; i++)
+    {
+      int ip1 = entry_ip << 8 * i >> 24;
+      int ip2 = ip << 8 * i >> 24;
+      if (ip1 == ip2)
+        curr_match++;
+      else
+        break;
     }
-    
-    return prefix_match;
+    if (curr_match > max_match)
+    {
+      max_match = curr_match;
+      max_entry = entry;
+    }
+    entry = entry->next;
+  }
+
+  /* Return NULL if no match */
+  if (max_match == 0){
+    return NULL;
+  }
+  return max_entry; /* need to free*/
 }
 
 struct sr_if *sr_get_interface_from_addr(struct sr_instance *sr, const unsigned char *addr)
