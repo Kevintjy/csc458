@@ -123,7 +123,7 @@ void sr_handlepacket(struct sr_instance* sr,
     } else if (ethertype(packet) == ethertype_arp) { /* handle ARP packet*/
         sr_handle_arp(sr, packet, len, iface);
     }else{
-        fprintf(stderr, "Unknown ethertype\n")
+        fprintf(stderr, "Unknown ethertype\n");
     }
 }
 
