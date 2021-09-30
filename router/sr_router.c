@@ -169,7 +169,6 @@ void sr_handle_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len, str
       }
       
       struct sr_if *oiface = sr_get_interface(sr, rt->interface);
-      free(rt);
       sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
     } else { /*  find the destination interface */
         if (ip_hdr->ip_p == ip_protocol_icmp) {
