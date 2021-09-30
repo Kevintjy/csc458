@@ -564,7 +564,7 @@ char *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip)
     if (curr_match > max_match)
     {
       max_match = curr_match;
-      strncpy(interface, entry->interface, sr_IFACE_NAMELEN);
+      strncpy(interface, curr->interface, sr_IFACE_NAMELEN);
     }
     curr = curr->next;
   }
