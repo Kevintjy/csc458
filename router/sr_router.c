@@ -30,7 +30,7 @@ static void sr_handle_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int
 static void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t icmp_type, uint8_t icmp_code);
 
 static void sr_lookup_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *oiface, uint32_t ip);
-struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip);
+char *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip);
 static void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *iface);
 static void sr_send_arp_reply(struct sr_instance *sr, uint8_t *packet, struct sr_if *oiface, struct sr_if *tiface);
 static void sr_send_arp_request(struct sr_instance *sr, struct sr_if *oiface, uint32_t tip);
@@ -161,14 +161,14 @@ void sr_handle_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len, str
       ip_hdr->ip_sum = 0;
       ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * 4);
       
-      struct sr_rt *rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_dst);
+      char* new_interface = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_dst);
       
-      if (!rt) {
+      if (!new_interface) {
           sr_send_icmp(sr, packet, len, 3, 0);
           return;
       }
       
-      struct sr_if *oiface = sr_get_interface(sr, rt->interface);
+      struct sr_if *oiface = sr_get_interface(sr, new_interface);
       sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
     } else { /*  find the destination interface */
         if (ip_hdr->ip_p == ip_protocol_icmp) {
@@ -222,15 +222,15 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
     sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + (ip_hdr->ip_hl * 4));
     
 
-    struct sr_rt *rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_src);
+    char* new_interface = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_src);
     
-    if (!rt) {
+    if (!new_interface) {
         
         return;
     }
     
     
-    struct sr_if *oiface = sr_get_interface(sr, rt->interface);
+    struct sr_if *oiface = sr_get_interface(sr, new_interface);
     
     if (icmp_type == 0) {
         
@@ -536,14 +536,13 @@ void sr_send_arp_request(struct sr_instance *sr, struct sr_if *oiface, uint32_t 
     free(buf);
 } /* -- sr_send_arp_request -- */
 
-struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip)
+char *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip)
 {
   ip = ntohl(ip);
   char *interface = malloc(sr_IFACE_NAMELEN);
   interface[0] = '\0';
   int max_match = 0;
   struct sr_rt *curr = sr;
-  struct sr_rt *max_entry = NULL;
 
   /* Iterate all entries in the routing table */
   while (curr != NULL)
@@ -565,7 +564,7 @@ struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip
     if (curr_match > max_match)
     {
       max_match = curr_match;
-      max_entry = curr;
+      strncpy(interface, entry->interface, sr_IFACE_NAMELEN);
     }
     curr = curr->next;
   }
@@ -574,7 +573,7 @@ struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip
   if (max_match == 0){
     return NULL;
   }
-  return max_entry; /* need to free*/
+  return interface; /* need to free*/
 }
 
 struct sr_if *sr_get_interface_from_addr(struct sr_instance *sr, const unsigned char *addr)
