@@ -542,14 +542,14 @@ struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip
   char *interface = malloc(sr_IFACE_NAMELEN);
   interface[0] = '\0';
   int max_match = 0;
-  struct sr_rt *entry = routing_table;
+  struct sr_rt *curr = sr;
   struct sr_rt *max_entry = NULL;
 
   /* Iterate all entries in the routing table */
-  while (entry != NULL)
+  while (curr != NULL)
   {
     int curr_match = 0;
-    uint32_t entry_ip = ntohl(entry->dest.s_addr);
+    uint32_t entry_ip = ntohl(curr->dest.s_addr);
 
     /* Split IP address into 4 parts */
     int i;
@@ -565,9 +565,9 @@ struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip
     if (curr_match > max_match)
     {
       max_match = curr_match;
-      max_entry = entry;
+      max_entry = curr;
     }
-    entry = entry->next;
+    curr = curr->next;
   }
 
   /* Return NULL if no match */
