@@ -222,7 +222,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
     sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + (ip_hdr->ip_hl * 4));
     
 
-    char* rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_src);
+    struct sr_rt* rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_src);
     
     if (!rt) {
         
