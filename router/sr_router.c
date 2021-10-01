@@ -267,12 +267,12 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         ip_res_hdr->ip_hl = sizeof(sr_ip_hdr_t) / 4;
         ip_res_hdr->ip_tos = 0;
         ip_res_hdr->ip_id = htons(0);
-        ip_res_hdr->ip_off = IP_DF;
+        ip_res_hdr->ip_off = htons(IP_DF);
         ip_res_hdr->ip_ttl = 100;
         ip_res_hdr->ip_p = ip_protocol_icmp;
         ip_res_hdr->ip_src = (code == 0 || code == 1) ? oiface->ip : ip_hdr->ip_dst;
         ip_res_hdr->ip_dst = ip_hdr->ip_src;
-        ip_res_hdr->ip_len = sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+        ip_res_hdr->ip_len = htons(sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
         ip_res_hdr->ip_sum = 0;
         ip_res_hdr->ip_sum = cksum(ip_hdr, sizeof(sr_ip_hdr_t));
         
