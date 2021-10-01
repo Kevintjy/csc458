@@ -172,7 +172,7 @@ void sr_handle_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len, str
     } else { /*  find the destination interface */
         sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
         if (ip_hdr->ip_p == ip_protocol_icmp) {
-          if (len < sizeof(sr_ethernet_hdr_t) + size(sr_ip_hdr_t)+ sizeof(sr_icmp_hdr_t)) {
+          if (len < sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)+ sizeof(sr_icmp_hdr_t)) {
             fprintf(stderr, "Failed to process ICMP header, insufficient length\n");
             return;
           }
