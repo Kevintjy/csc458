@@ -199,7 +199,7 @@ void sr_handlepacket(struct sr_instance* sr,
     }
 }
 
-void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t icmp_type, uint8_t icmp_code)
+void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t type, uint8_t code)
 {
     assert(sr);
     assert(packet);
@@ -207,83 +207,87 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
     sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
     sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
     sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+    int icmp_len = len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t)
     
 
-    struct sr_rt* rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_src);
-    
-    if (!rt) {
-        
-        return;
+    /* get lontgest prefix */
+    struct sr_rt* rt_walker = sr->routing_table;
+    uint32_t max_mask = 0;
+    uint32_t mask;
+    uint32_t dest;
+    uint32_t temp;
+    struct sr_rt* rt = NULL;
+
+    while (rt_walker != NULL) {
+      mask = rt_walker->mask.s_addr;
+      dest = rt_walker->dest.s_addr;
+      temp = ip_hdr->ip_dst & mask;
+      dest = dest & mask;
+      if(temp == dest && mask >= max_mask){
+        rt = rt_walker;
+        max_mask = mask;
+      }
+      rt_walker = rt_walker->next;
     }
     
-    
+    if (!rt) {
+        fprintf(stderr, "there is no rt");
+        return;
+    }
     struct sr_if *oiface = sr_get_interface(sr, rt->interface);
     
-    if (icmp_type == 0) {
+    if (type == 0) { /* echo reply */
+        memset(eth_hdr->ether_dhost, eth_hdr->ether_shost, ETHER_ADDR_LEN);
+        memset(eth_hdr->ether_shost, oiface.addr, ETHER_ADDR_LEN);
         
-        memset(eth_hdr->ether_dhost, 0, ETHER_ADDR_LEN);
-        memset(eth_hdr->ether_shost, 0, ETHER_ADDR_LEN);
-        
-        uint32_t ip_dst = ip_hdr->ip_src;
+        /* exchange ip src and dst */
+        uint32_t tmp = ip_hdr->ip_src;
         ip_hdr->ip_src = ip_hdr->ip_dst;
-        ip_hdr->ip_dst = ip_dst;
-        
-        
-        icmp_hdr->icmp_type = 0;
-        icmp_hdr->icmp_code = 0;
+        ip_hdr->ip_dst = tmp;
+        /* set the type and code */
+        icmp_hdr->icmp_type = type;
+        icmp_hdr->icmp_code = code;
+        /* recalculate the checksum */
         icmp_hdr->icmp_sum = 0;
         icmp_hdr->icmp_sum = cksum(icmp_hdr, ntohs(ip_hdr->ip_len) - (ip_hdr->ip_hl * 4));
        
         sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
-    } else if (icmp_type == 3) {
-        unsigned int new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
-        uint8_t *buf = (uint8_t *)malloc(new_len);
-        assert(buf);
+    } else if (type == 3) {
+       /* malloc space for new response */
+        uint8_t *buf = malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
+        sr_ethernet_hdr_t *eth_res_hdr = (sr_ethernet_hdr_t *)buf;
+        sr_ip_hdr_t *ip_res_hdr = (sr_ip_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
+        sr_icmp_t3_hdr_t *icmp_res_hdr = (sr_icmp_t3_hdrsr_icmp_t3_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
         
-        sr_ethernet_hdr_t *new_eth_hdr = (sr_ethernet_hdr_t *)buf;
-        sr_ip_hdr_t *new_ip_hdr = (sr_ip_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
-        sr_icmp_t3_hdr_t *new_icmp_hdr = (sr_icmp_t3_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+        memset(eth_res_hdr->ether_dhost, eth_hdr->ether_shost, ETHER_ADDR_LEN);
+        memset(eth_res_hdr->ether_shost, oiface.addr, ETHER_ADDR_LEN);
+        eth_res_hdr->ether_type = htons(ethertype_ip);
+
+        eth_res_hdr->ip_v = 4; /* IPv4 */
+        eth_res_hdr->ip_hl = sizeof(sr_ip_hdr_t) / 4;
+        eth_res_hdr->ip_tos = 0;
+        eth_res_hdr->ip_id = 0;
+        eth_res_hdr->ip_off = IP_DF;
+        eth_res_hdr->ip_ttl = 100;
+        eth_res_hdr->ip_p = ip_protocol_icmp;
+        eth_res_hdr->ip_src = (code == 0 || code == 1) ? oiface->ip : ip_hdr->ip_dst;
+        eth_res_hdr->ip_dst = ip_hdr->ip_src;
+        eth_res_hdr->ip_len = sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+        eth_res_hdr->ip_sum = 0;
+        eth_res_hdr->ip_sum = cksum(iphdr, sizeof(sr_ip_hdr_t));
         
-       
-        memset(new_eth_hdr->ether_dhost, 0, ETHER_ADDR_LEN);
-        memset(new_eth_hdr->ether_shost, 0, ETHER_ADDR_LEN);
-        new_eth_hdr->ether_type = htons(ethertype_ip);
+        /* set the type and code */
+        icmp_res_hdr->icmp_type = type;
+        icmp_res_hdr->icmp_code = code;
+        icmp_res_hdr->icmp_sum = 0;
+        icmp_res_hdr->next_mtu = 0;
+        icmp_res_hdr->unused = 0;
+        memcpy(icmp_res_hdr->data, ip_hdr, ICMP_DATA_SIZE);
+        icmp_res_hdr->icmp_sum = cksum(icmp_res_hdr, sizeof(sr_icmp_t3_hdr_t));
         
-    
-        new_ip_hdr->ip_v = 4;
-        new_ip_hdr->ip_hl = sizeof(sr_ip_hdr_t) / 4;
-        new_ip_hdr->ip_tos = 0;
-        new_ip_hdr->ip_len = htons(sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
-        new_ip_hdr->ip_id = htons(0);
-        new_ip_hdr->ip_off = htons(IP_DF);
-        new_ip_hdr->ip_ttl = 64;
-        new_ip_hdr->ip_p = ip_protocol_icmp;
-        
-        if (icmp_code == 3) {
-            new_ip_hdr->ip_src = ip_hdr->ip_dst;
-        } else {
-            new_ip_hdr->ip_src = oiface->ip;
-        }
-        
-        new_ip_hdr->ip_dst = ip_hdr->ip_src;
-        
-        new_ip_hdr->ip_sum = 0;
-        new_ip_hdr->ip_sum = cksum(new_ip_hdr, sizeof(sr_ip_hdr_t));
-        
-        /* icmp header */
-        new_icmp_hdr->icmp_type = icmp_type;
-        new_icmp_hdr->icmp_code = icmp_code;
-        new_icmp_hdr->unused = 0;
-        new_icmp_hdr->next_mtu = 0;
-        memcpy(new_icmp_hdr->data, ip_hdr, ICMP_DATA_SIZE);
-        
-        new_icmp_hdr->icmp_sum = 0;
-        new_icmp_hdr->icmp_sum = cksum(new_icmp_hdr, sizeof(sr_icmp_t3_hdr_t));
-        
-        /* print_hdrs(buf, new_len); */
         sr_lookup_and_send(sr, buf, new_len, oiface, rt->gw.s_addr);
         free(buf);
-    } else if (icmp_type == 11) {
+    } else if (type == 11) {
         unsigned int new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
         uint8_t *buf = (uint8_t *)malloc(new_len);
         assert(buf);
