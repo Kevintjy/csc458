@@ -274,7 +274,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         ip_res_hdr->ip_dst = ip_hdr->ip_src;
         ip_res_hdr->ip_len = sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
         ip_res_hdr->ip_sum = 0;
-        ip_res_hdr->ip_sum = cksum(iphdr, sizeof(sr_ip_hdr_t));
+        ip_res_hdr->ip_sum = cksum(ip_hdr, sizeof(sr_ip_hdr_t));
         
         /* set the type and code */
         icmp_res_hdr->icmp_type = type;
@@ -285,7 +285,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         memcpy(icmp_res_hdr->data, ip_hdr, ICMP_DATA_SIZE);
         icmp_res_hdr->icmp_sum = cksum(icmp_res_hdr, sizeof(sr_icmp_t3_hdr_t));
         
-        sr_lookup_and_send(sr, buf, new_len, oiface, rt->gw.s_addr);
+        sr_lookup_and_send(sr, buf, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t), oiface, rt->gw.s_addr);
         free(buf);
     } else if (type == 11) {
         unsigned int new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
@@ -317,8 +317,8 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         new_ip_hdr->ip_sum = cksum(new_ip_hdr, sizeof(sr_ip_hdr_t));
         
         /* icmp header */
-        new_icmp_hdr->icmp_type = icmp_type;
-        new_icmp_hdr->icmp_code = icmp_code;
+        new_icmp_hdr->icmp_type = type;
+        new_icmp_hdr->icmp_code = code;
         new_icmp_hdr->unused = 0;
         memcpy(new_icmp_hdr->data, ip_hdr, ICMP_DATA_SIZE);
         
