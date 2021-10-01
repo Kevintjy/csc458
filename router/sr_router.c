@@ -230,7 +230,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
     }
     
     if (!rt) {
-        fprintf(stderr, "no interface found")
+        fprintf(stderr, "no interface found");
         return;
     }
     
