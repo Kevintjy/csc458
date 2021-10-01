@@ -288,8 +288,8 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         new_ip_hdr->ip_sum = cksum(new_ip_hdr, sizeof(sr_ip_hdr_t));
         
         /* icmp header */
-        new_icmp_hdr->icmp_type = icmp_type;
-        new_icmp_hdr->icmp_code = icmp_code;
+        new_icmp_hdr->icmp_type = type;
+        new_icmp_hdr->icmp_code = code;
         new_icmp_hdr->unused = 0;
         new_icmp_hdr->next_mtu = 0;
         memcpy(new_icmp_hdr->data, ip_hdr, ICMP_DATA_SIZE);
