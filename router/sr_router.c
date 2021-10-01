@@ -116,20 +116,19 @@ void sr_handlepacket(struct sr_instance* sr,
     struct sr_if *iface = sr_get_interface(sr, interface);
     
     if (ethertype(packet) == ethertype_ip) { /* handle IP packet*/
-    /* check the length */
-    if (len < sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)) {
-        fprintf(stderr, "IP header is too short\n");
-        return;
-    }
+      /* check the length */
+      if (len < sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)) {
+          fprintf(stderr, "IP header is too short\n");
+          return;
+      }
 
-    sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
-    sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
-    
-    /* verify checksum */
-    if (cksum(ip_hdr, ip_hdr->ip_hl * 4) != 0xffff)
-    {
-      fprintf(stderr, "checksum does not match\n");
-      return;
+      sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+      
+      /* verify checksum */
+      if (cksum(ip_hdr, ip_hdr->ip_hl * 4) != 0xffff)
+      {
+        fprintf(stderr, "checksum does not match\n");
+        return;
       }
 
       /* check the IP version */
@@ -137,7 +136,7 @@ void sr_handlepacket(struct sr_instance* sr,
           fprintf(stderr, "IP is not IPV4\n");
           return;
       }
-      
+        
       struct sr_if *dest_interface = sr_get_interface_from_ip(sr, ip_hdr->ip_dst);
       
       if (dest_interface == 0) { /* not find the destination interface */
@@ -149,7 +148,25 @@ void sr_handlepacket(struct sr_instance* sr,
         ip_hdr->ip_sum = 0;
         ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * 4);
         
-        struct sr_rt * rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_dst);
+        /* get lontgest prefix */
+        struct sr_rt* rt_walker = sr->routing_table;
+        uint32_t max_mask = 0;
+        uint32_t mask;
+        uint32_t dest;
+        uint32_t temp;
+        struct sr_rt* ret = NULL;
+
+        while (rt_walker != NULL) {
+          mask = rt_walker->mask.s_addr;
+          dest = rt_walker->dest.s_addr;
+          temp = ip_hdr->ip_dst & mask;
+          dest = dest & mask;
+          if(temp == dest && mask >= max_mask){
+            ret = rt_walker;
+            max_mask = mask;
+          }
+          rt_walker = rt_walker->next;
+        }
         
         if (!rt) { /* there is no entry in routing table */
             sr_send_icmp(sr, packet, len, 3, 0);
