@@ -162,10 +162,11 @@ void sr_handle_ip(struct sr_instance *sr, uint8_t *packet, unsigned int len, str
       
       struct sr_rt * rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_dst);
       
-      if (!rt) {
-          printf("already send the icmp message, end");
+      if (!rt) { /* there is no entry in routing table */
+          sr_send_icmp(sr, packet, len, 3, 0);
           return;
       }
+
       struct sr_if *oiface = sr_get_interface(sr, rt->interface);
       sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
     } else { /*  find the destination interface */
@@ -517,9 +518,9 @@ struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip
   struct sr_rt* rt_walker = sr->routing_table;
   
   uint32_t max_mask = 0;
-  uint32_t mask = 0;
-  uint32_t dest = 0;
-  uint32_t temp = 0;
+  uint32_t mask;
+  uint32_t dest;
+  uint32_t temp;
   struct sr_rt* ret = NULL;
 
   while (rt_walker != NULL) {
@@ -532,10 +533,6 @@ struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip
       max_mask = mask;
     }
     rt_walker = rt_walker->next;
-  }
-  if (ret == NULL){
-    sr_send_icmp(sr, packet, len, 3, 0);
-    return NULL;
   }
   return ret; 
 }
