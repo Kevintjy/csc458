@@ -266,7 +266,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         ip_res_hdr->ip_v = 4; /* IPv4 */
         ip_res_hdr->ip_hl = sizeof(sr_ip_hdr_t) / 4;
         ip_res_hdr->ip_tos = 0;
-        ip_res_hdr->ip_id = 0;
+        ip_res_hdr->ip_id = htons(0);
         ip_res_hdr->ip_off = IP_DF;
         ip_res_hdr->ip_ttl = 100;
         ip_res_hdr->ip_p = ip_protocol_icmp;
