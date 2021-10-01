@@ -199,60 +199,43 @@ void sr_handlepacket(struct sr_instance* sr,
     }
 }
 
-void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t type, uint8_t code)
+void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t icmp_type, uint8_t icmp_code)
 {
     assert(sr);
     assert(packet);
     
     sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
     sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
-    sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
-    int icmp_len = len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t);
+    sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + (ip_hdr->ip_hl * 4));
     
 
-    /* get lontgest prefix */
-    struct sr_rt* rt_walker = sr->routing_table;
-    uint32_t max_mask = 0;
-    uint32_t mask;
-    uint32_t dest;
-    uint32_t temp;
-    struct sr_rt* rt = NULL;
-
-    while (rt_walker != NULL) {
-      mask = rt_walker->mask.s_addr;
-      dest = rt_walker->dest.s_addr;
-      temp = ip_hdr->ip_dst & mask;
-      dest = dest & mask;
-      if(temp == dest && mask >= max_mask){
-        rt = rt_walker;
-        max_mask = mask;
-      }
-      rt_walker = rt_walker->next;
-    }
+    struct sr_rt *rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_src);
     
     if (!rt) {
-        fprintf(stderr, "there is no rt");
+        
         return;
     }
+    
+    
     struct sr_if *oiface = sr_get_interface(sr, rt->interface);
     
-    if (type == 0) { /* echo reply */
+    if (icmp_type == 0) {
+        
         memset(eth_hdr->ether_dhost, 0, ETHER_ADDR_LEN);
         memset(eth_hdr->ether_shost, 0, ETHER_ADDR_LEN);
         
-        /* exchange ip src and dst */
-        uint32_t tmp = ip_hdr->ip_src;
+        uint32_t ip_dst = ip_hdr->ip_src;
         ip_hdr->ip_src = ip_hdr->ip_dst;
-        ip_hdr->ip_dst = tmp;
-        /* set the type and code */
-        icmp_hdr->icmp_type = type;
-        icmp_hdr->icmp_code = code;
-        /* recalculate the checksum */
+        ip_hdr->ip_dst = ip_dst;
+        
+        
+        icmp_hdr->icmp_type = 0;
+        icmp_hdr->icmp_code = 0;
         icmp_hdr->icmp_sum = 0;
         icmp_hdr->icmp_sum = cksum(icmp_hdr, ntohs(ip_hdr->ip_len) - (ip_hdr->ip_hl * 4));
        
         sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
-    } else if (type == 3) {
+    } else if (icmp_type == 3) {
         unsigned int new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
         uint8_t *buf = (uint8_t *)malloc(new_len);
         assert(buf);
@@ -276,7 +259,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         new_ip_hdr->ip_ttl = 64;
         new_ip_hdr->ip_p = ip_protocol_icmp;
         
-        if (code == 3) {
+        if (icmp_code == 3) {
             new_ip_hdr->ip_src = ip_hdr->ip_dst;
         } else {
             new_ip_hdr->ip_src = oiface->ip;
@@ -288,8 +271,8 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         new_ip_hdr->ip_sum = cksum(new_ip_hdr, sizeof(sr_ip_hdr_t));
         
         /* icmp header */
-        new_icmp_hdr->icmp_type = type;
-        new_icmp_hdr->icmp_code = code;
+        new_icmp_hdr->icmp_type = icmp_type;
+        new_icmp_hdr->icmp_code = icmp_code;
         new_icmp_hdr->unused = 0;
         new_icmp_hdr->next_mtu = 0;
         memcpy(new_icmp_hdr->data, ip_hdr, ICMP_DATA_SIZE);
@@ -300,7 +283,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         /* print_hdrs(buf, new_len); */
         sr_lookup_and_send(sr, buf, new_len, oiface, rt->gw.s_addr);
         free(buf);
-    } else if (type == 11) {
+    } else if (icmp_type == 11) {
         unsigned int new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
         uint8_t *buf = (uint8_t *)malloc(new_len);
         assert(buf);
@@ -330,8 +313,8 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         new_ip_hdr->ip_sum = cksum(new_ip_hdr, sizeof(sr_ip_hdr_t));
         
         /* icmp header */
-        new_icmp_hdr->icmp_type = type;
-        new_icmp_hdr->icmp_code = code;
+        new_icmp_hdr->icmp_type = icmp_type;
+        new_icmp_hdr->icmp_code = icmp_code;
         new_icmp_hdr->unused = 0;
         memcpy(new_icmp_hdr->data, ip_hdr, ICMP_DATA_SIZE);
         
