@@ -179,14 +179,14 @@ void sr_handlepacket(struct sr_instance* sr,
           sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
           if (ip_hdr->ip_p == ip_protocol_icmp) {
             if (len < sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)+ sizeof(sr_icmp_hdr_t)) {
-              fprintf(stderr, "Failed to process ICMP header, insufficient length\n");
+              fprintf(stderr, "ICMP header has insufficient length\n");
               return;
             }
             if (icmp_hdr->icmp_type == 8){ /* this is a icmp echo request */
               sr_send_icmp(sr, packet, len, 0, 0);
             }
 
-          } else if (ip_hdr->ip_p == 0x0006 || ip_hdr->ip_p == 0x0011) {
+          } else if (ip_hdr->ip_p == 6 || ip_hdr->ip_p == 11) {
               sr_send_icmp(sr, packet, len, 3, 3);
           }else{
             fprintf(stderr, "reach unknown state");
