@@ -263,18 +263,18 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         memset(eth_res_hdr->ether_shost, oiface.addr, ETHER_ADDR_LEN);
         eth_res_hdr->ether_type = htons(ethertype_ip);
 
-        eth_res_hdr->ip_v = 4; /* IPv4 */
-        eth_res_hdr->ip_hl = sizeof(sr_ip_hdr_t) / 4;
-        eth_res_hdr->ip_tos = 0;
-        eth_res_hdr->ip_id = 0;
-        eth_res_hdr->ip_off = IP_DF;
-        eth_res_hdr->ip_ttl = 100;
-        eth_res_hdr->ip_p = ip_protocol_icmp;
-        eth_res_hdr->ip_src = (code == 0 || code == 1) ? oiface->ip : ip_hdr->ip_dst;
-        eth_res_hdr->ip_dst = ip_hdr->ip_src;
-        eth_res_hdr->ip_len = sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
-        eth_res_hdr->ip_sum = 0;
-        eth_res_hdr->ip_sum = cksum(iphdr, sizeof(sr_ip_hdr_t));
+        ip_res_hdr->ip_v = 4; /* IPv4 */
+        ip_res_hdr->ip_hl = sizeof(sr_ip_hdr_t) / 4;
+        ip_res_hdr->ip_tos = 0;
+        ip_res_hdr->ip_id = 0;
+        ip_res_hdr->ip_off = IP_DF;
+        ip_res_hdr->ip_ttl = 100;
+        ip_res_hdr->ip_p = ip_protocol_icmp;
+        ip_res_hdr->ip_src = (code == 0 || code == 1) ? oiface->ip : ip_hdr->ip_dst;
+        ip_res_hdr->ip_dst = ip_hdr->ip_src;
+        ip_res_hdr->ip_len = sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+        ip_res_hdr->ip_sum = 0;
+        ip_res_hdr->ip_sum = cksum(iphdr, sizeof(sr_ip_hdr_t));
         
         /* set the type and code */
         icmp_res_hdr->icmp_type = type;
