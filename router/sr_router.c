@@ -154,7 +154,7 @@ void sr_handlepacket(struct sr_instance* sr,
         uint32_t mask;
         uint32_t dest;
         uint32_t temp;
-        struct sr_rt* ret = NULL;
+        struct sr_rt* rt = NULL;
 
         while (rt_walker != NULL) {
           mask = rt_walker->mask.s_addr;
@@ -162,7 +162,7 @@ void sr_handlepacket(struct sr_instance* sr,
           temp = ip_hdr->ip_dst & mask;
           dest = dest & mask;
           if(temp == dest && mask >= max_mask){
-            ret = rt_walker;
+            rt = rt_walker;
             max_mask = mask;
           }
           rt_walker = rt_walker->next;
