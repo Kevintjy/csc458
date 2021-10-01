@@ -276,7 +276,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         new_ip_hdr->ip_ttl = 64;
         new_ip_hdr->ip_p = ip_protocol_icmp;
         
-        if (icmp_code == 3) {
+        if (code == 3) {
             new_ip_hdr->ip_src = ip_hdr->ip_dst;
         } else {
             new_ip_hdr->ip_src = oiface->ip;
