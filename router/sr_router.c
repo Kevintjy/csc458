@@ -238,7 +238,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
     
     if (type == 0) { /* echo reply */
         memset(eth_hdr->ether_dhost, eth_hdr->ether_shost, ETHER_ADDR_LEN);
-        memset(eth_hdr->ether_shost, oiface.addr, ETHER_ADDR_LEN);
+        memset(eth_hdr->ether_shost, oiface->addr, ETHER_ADDR_LEN);
         
         /* exchange ip src and dst */
         uint32_t tmp = ip_hdr->ip_src;
@@ -257,10 +257,10 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         uint8_t *buf = malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
         sr_ethernet_hdr_t *eth_res_hdr = (sr_ethernet_hdr_t *)buf;
         sr_ip_hdr_t *ip_res_hdr = (sr_ip_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
-        sr_icmp_t3_hdr_t *icmp_res_hdr = (sr_icmp_t3_hdrsr_icmp_t3_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+        sr_icmp_t3_hdr_t *icmp_res_hdr = (sr_icmp_t3_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
         
         memset(eth_res_hdr->ether_dhost, eth_hdr->ether_shost, ETHER_ADDR_LEN);
-        memset(eth_res_hdr->ether_shost, oiface.addr, ETHER_ADDR_LEN);
+        memset(eth_res_hdr->ether_shost, oiface->addr, ETHER_ADDR_LEN);
         eth_res_hdr->ether_type = htons(ethertype_ip);
 
         ip_res_hdr->ip_v = 4; /* IPv4 */
