@@ -206,13 +206,31 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
     
     sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
     sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
-    sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + (ip_hdr->ip_hl * 4));
+    sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
     
 
-    struct sr_rt *rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_src);
+    /* get lontgest prefix */
+    struct sr_rt* rt_walker = sr->routing_table;
+    uint32_t max_mask = 0;
+    uint32_t mask;
+    uint32_t dest;
+    uint32_t temp;
+    struct sr_rt* rt = NULL;
+
+    while (rt_walker != NULL) {
+      mask = rt_walker->mask.s_addr;
+      dest = rt_walker->dest.s_addr;
+      temp = ip_hdr->ip_dst & mask;
+      dest = dest & mask;
+      if(temp == dest && mask >= max_mask){
+        rt = rt_walker;
+        max_mask = mask;
+      }
+      rt_walker = rt_walker->next;
+    }
     
     if (!rt) {
-        
+        fprintf(stderr, "no interface found")
         return;
     }
     
@@ -224,7 +242,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         memset(eth_hdr->ether_dhost, 0, ETHER_ADDR_LEN);
         memset(eth_hdr->ether_shost, 0, ETHER_ADDR_LEN);
         
-        uint32_t ip_dst = ip_hdr->ip_src;
+        uint32_t tmp = ip_hdr->ip_src;
         ip_hdr->ip_src = ip_hdr->ip_dst;
         ip_hdr->ip_dst = ip_dst;
         
