@@ -117,7 +117,65 @@ void sr_handlepacket(struct sr_instance* sr,
     struct sr_if *iface = sr_get_interface(sr, interface);
     
     if (ethertype(packet) == ethertype_ip) { /* handle IP packet*/
-        sr_handle_ip(sr, packet, len, iface);
+    /* check the length */
+    if (len < sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)) {
+        fprintf(stderr, "IP header is too short\n");
+        return;
+    }
+
+    sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
+    sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+    
+    /* verify checksum */
+    if (cksum(ip_hdr, ip_hdr->ip_hl * 4) != 0xffff)
+    {
+      fprintf(stderr, "checksum does not match\n");
+      return;
+      }
+
+      /* check the IP version */
+      if(ip_hdr->ip_v != 4) {
+          fprintf(stderr, "IP is not IPV4\n");
+          return;
+      }
+      
+      struct sr_if *dest_interface = sr_get_interface_from_ip(sr, ip_hdr->ip_dst);
+      
+      if (dest_interface == 0) { /* not find the destination interface */
+        if (--ip_hdr->ip_ttl == 0) {
+          sr_send_icmp(sr, packet, len, 11, 0); /* TTL=0 means time exceed */
+          return;
+        }
+        /* recalculate the checksum */
+        ip_hdr->ip_sum = 0;
+        ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * 4);
+        
+        struct sr_rt * rt = sr_longest_prefix_match_lookup(sr, ip_hdr->ip_dst);
+        
+        if (!rt) { /* there is no entry in routing table */
+            sr_send_icmp(sr, packet, len, 3, 0);
+            return;
+        }
+
+        struct sr_if *oiface = sr_get_interface(sr, rt->interface);
+        sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
+      } else { /*  find the destination interface */
+          sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+          if (ip_hdr->ip_p == ip_protocol_icmp) {
+            if (len < sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)+ sizeof(sr_icmp_hdr_t)) {
+              fprintf(stderr, "Failed to process ICMP header, insufficient length\n");
+              return;
+            }
+            if (icmp_hdr->icmp_type == 8){ /* this is a icmp echo request */
+              sr_send_icmp(sr, packet, len, 0, 0);
+            }
+
+          } else if (ip_hdr->ip_p == 0x0006 || ip_hdr->ip_p == 0x0011) {
+              sr_send_icmp(sr, packet, len, 3, 3);
+          }else{
+            fprintf(stderr, "reach unknown state");
+          }
+      }
     } else if (ethertype(packet) == ethertype_arp) { /* handle ARP packet*/
         sr_handle_arp(sr, packet, len, iface);
     }else{
