@@ -354,43 +354,6 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req)
 void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *iface)
 {
     assert(sr);
-    assert(req);
-    
-    if (difftime(time(NULL), req->sent) >= 1.0) {
-        if (req->times_sent >= 5) {
-            struct sr_packet *pkt = NULL;
-            sr_ethernet_hdr_t *eth_hdr = NULL;
-            struct sr_if *iface = NULL;
-            
-            pkt = req->packets;
-            
-            while (pkt) {
-                eth_hdr = (sr_ethernet_hdr_t *)(pkt->buf);
-                iface = sr_get_interface_from_addr(sr, eth_hdr->ether_dhost);
-                
-                /* do not send an ICMP message for an ICMP message */
-                if (iface) {
-                    sr_send_icmp(sr, pkt->buf, pkt->len, 3, 1);
-                }
-                
-                pkt = pkt->next;
-            }
-            
-            sr_arpreq_destroy(&(sr->cache), req);
-        } else {
-            struct sr_if *oiface = sr_get_interface(sr, req->packets->iface);
-            
-            sr_send_arp_request(sr, oiface, req->ip);
-            
-            req->sent = time(NULL);
-            req->times_sent++;
-        }
-    }
-} /* -- sr_handle_arpreq -- */
-
-void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *iface)
-{
-    assert(sr);
     assert(packet);
     assert(iface);
     
