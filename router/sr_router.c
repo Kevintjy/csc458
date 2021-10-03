@@ -253,17 +253,18 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
        
         sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
     } else if (type == 3 || type == 11) {
-       /* malloc space for new response */
+        /* malloc space for new response */
         uint8_t *buf = malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
-        sr_ethernet_hdr_t *eth_res_hdr = (sr_ethernet_hdr_t *)buf;
-        sr_ip_hdr_t *ip_res_hdr = (sr_ip_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
-        sr_icmp_t3_hdr_t *icmp_res_hdr = (sr_icmp_t3_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
         
+        /* set the eth respnse header */
+        sr_ethernet_hdr_t *eth_res_hdr = (sr_ethernet_hdr_t *)buf;
         memset(eth_res_hdr->ether_dhost, 0, ETHER_ADDR_LEN);
         memset(eth_res_hdr->ether_shost, 0, ETHER_ADDR_LEN);
         eth_res_hdr->ether_type = htons(ethertype_ip);
 
-        ip_res_hdr->ip_v = 4; /* IPv4 */
+        /* set the ip respnse header */
+        sr_ip_hdr_t *ip_res_hdr = (sr_ip_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
+        ip_res_hdr->ip_v = 4;
         ip_res_hdr->ip_hl = sizeof(sr_ip_hdr_t) / 4;
         ip_res_hdr->ip_tos = 0;
         ip_res_hdr->ip_id = 0;
@@ -276,7 +277,8 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         ip_res_hdr->ip_sum = 0;
         ip_res_hdr->ip_sum = cksum(ip_hdr, sizeof(sr_ip_hdr_t));
         
-        /* set the type and code */
+        /* set the icmp respnse header */
+        sr_icmp_t3_hdr_t *icmp_res_hdr = (sr_icmp_t3_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
         icmp_res_hdr->icmp_type = type;
         icmp_res_hdr->icmp_code = code;
         icmp_res_hdr->icmp_sum = 0;
@@ -294,13 +296,9 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
 
 void sr_lookup_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *oiface, uint32_t ip)
 {
-    assert(sr);
-    assert(packet);
-    assert(oiface);
-    
     struct sr_arpentry *entry = sr_arpcache_lookup(&(sr->cache), ip);
     
-    if (entry) {
+    if (entry) { ¸/* if the entry is in arp cache*/
         sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
         
         memcpy(eth_hdr->ether_dhost, entry->mac, ETHER_ADDR_LEN);
