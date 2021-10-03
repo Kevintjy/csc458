@@ -404,23 +404,28 @@ void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, st
         fprintf(stderr, "arp packet has insufficient length\n");
         return;
     }
-    
+    sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
     sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
     
-    /* is it for me? */
     struct sr_if *tiface = sr_get_interface_from_ip(sr, arp_hdr->ar_tip);
     
-    if (!tiface) {
-        return;
-    }
-    
-    unsigned short arp_op = ntohs(arp_hdr->ar_op);
-    
-    if (arp_op == arp_op_request) {
+    if (ntohs(arp_hdr->ar_op) == arp_op_request) {
       if (tiface){
-        sr_send_arp_reply(sr, packet, iface, tiface);
+        /* ethernet header */
+        memcpy(eth_hdr->ether_dhost, eth_hdr->ether_shost, ETHER_ADDR_LEN);
+        memcpy(eth_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN);
+        
+        /* arp header */
+        arp_hdr->ar_op = htons(arp_op_reply);
+        memcpy(arp_hdr->ar_sha, tiface->addr, ETHER_ADDR_LEN);
+        memcpy(arp_hdr->ar_tha, arp_hdr->ar_sha, ETHER_ADDR_LEN);
+        uint32_t temp = arp_hdr->ar_sip;
+        arp_hdr->ar_sip = tiface->ip;
+        arp_hdr->ar_tip = temp;
+        
+        sr_send_packet(sr, packet, len, iface->name);
       }
-    } else if (arp_op == arp_op_reply) {
+    } else if (ntohs(arp_hdr->ar_op) == arp_op_reply) {
         if (tiface){
           struct sr_arpreq *req = sr_arpcache_insert(&(sr->cache), arp_hdr->ar_sha, arp_hdr->ar_sip);
           
@@ -443,7 +448,7 @@ void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, st
           }
       }
     }
-} /* -- sr_handle_arp -- */
+} 
 
 void sr_send_arp_reply(struct sr_instance *sr, uint8_t *packet, struct sr_if *oiface, struct sr_if *tiface)
 {
