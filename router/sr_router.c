@@ -384,7 +384,7 @@ void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, st
                   sr_send_packet(sr, pkt->buf, pkt->len, pkt->iface);
                   pkt = pkt->next;
               }
-              sr_arpreq_destroy(&(sr->cache), req);
+              sr_arpreq_destroy(&(sr->cache), arpreq);
           }
         }
     }else{
