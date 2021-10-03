@@ -298,7 +298,7 @@ void sr_lookup_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int le
 {
     struct sr_arpentry *entry = sr_arpcache_lookup(&(sr->cache), ip);
     
-    if (entry) { ¸/* if the entry is in arp cache*/
+    if (entry) { /* if the entry is in arp cache */
         sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
         
         memcpy(eth_hdr->ether_dhost, entry->mac, ETHER_ADDR_LEN);
