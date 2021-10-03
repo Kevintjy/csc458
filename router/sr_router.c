@@ -296,9 +296,13 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
 
 void sr_lookup_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *oiface, uint32_t ip)
 {
+    assert(sr);
+    assert(packet);
+    assert(oiface);
+    
     struct sr_arpentry *entry = sr_arpcache_lookup(&(sr->cache), ip);
     
-    if (entry) { /* if the entry is in arp cache */
+    if (entry) {
         sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
         
         memcpy(eth_hdr->ether_dhost, entry->mac, ETHER_ADDR_LEN);
@@ -307,12 +311,12 @@ void sr_lookup_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int le
         sr_send_packet(sr, packet, len, oiface->name);
         
         free(entry);
-    } else { /* not found, send it to queue and handle arpreq */
+    } else {
         struct sr_arpreq *req = sr_arpcache_queuereq(&(sr->cache), ip, packet, len, oiface->name);
         
         sr_handle_arpreq(sr, req);
     }
-} 
+} /* -- sr_lookup_and_send -- */
 
 void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req)
 {
@@ -413,7 +417,7 @@ void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, st
             sr_arpreq_destroy(&(sr->cache), req);
         }
     }
-}
+} /* -- sr_handle_arp -- */
 
 void sr_send_arp_reply(struct sr_instance *sr, uint8_t *packet, struct sr_if *oiface, struct sr_if *tiface)
 {
@@ -485,7 +489,6 @@ void sr_send_arp_request(struct sr_instance *sr, struct sr_if *oiface, uint32_t 
     sr_send_packet(sr, buf, len, oiface->name);
     free(buf);
 } /* -- sr_send_arp_request -- */
-
 struct sr_rt *sr_longest_prefix_match_lookup(struct sr_instance *sr, uint32_t ip)
 {
   struct sr_rt* rt_walker = sr->routing_table;
