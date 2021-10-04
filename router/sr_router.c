@@ -252,7 +252,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         icmp_hdr->icmp_sum = cksum(icmp_hdr, ntohs(ip_hdr->ip_len) - (ip_hdr->ip_hl * 4));
        
         sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
-    } else if (icmp_type == 3) {
+    } else if (icmp_type == 3 || icmp_type == 11) {
        /* malloc space for new response */
         uint8_t *buf = malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
         sr_ethernet_hdr_t *eth_res_hdr = (sr_ethernet_hdr_t *)buf;
@@ -287,47 +287,9 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         
         sr_lookup_and_send(sr, buf, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t), oiface, rt->gw.s_addr);
         free(buf);
-    } else if (icmp_type == 11) {
-        unsigned int new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
-        uint8_t *buf = (uint8_t *)malloc(new_len);
-        assert(buf);
-        
-        sr_ethernet_hdr_t *new_eth_hdr = (sr_ethernet_hdr_t *)buf;
-        sr_ip_hdr_t *new_ip_hdr = (sr_ip_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
-        sr_icmp_t3_hdr_t *new_icmp_hdr = (sr_icmp_t3_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
-        
-        /* ethernet header */
-        memset(new_eth_hdr->ether_dhost, 0, ETHER_ADDR_LEN);
-        memset(new_eth_hdr->ether_shost, 0, ETHER_ADDR_LEN);
-        new_eth_hdr->ether_type = htons(ethertype_ip);
-        
-        /* ip header */
-        new_ip_hdr->ip_v = 4;
-        new_ip_hdr->ip_hl = sizeof(sr_ip_hdr_t) / 4;
-        new_ip_hdr->ip_tos = 0;
-        new_ip_hdr->ip_len = htons(sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
-        new_ip_hdr->ip_id = htons(0);
-        new_ip_hdr->ip_off = htons(IP_DF);
-        new_ip_hdr->ip_ttl = 64;
-        new_ip_hdr->ip_p = ip_protocol_icmp;
-        new_ip_hdr->ip_src = oiface->ip;
-        new_ip_hdr->ip_dst = ip_hdr->ip_src;
-        
-        new_ip_hdr->ip_sum = 0;
-        new_ip_hdr->ip_sum = cksum(new_ip_hdr, sizeof(sr_ip_hdr_t));
-        
-        /* icmp header */
-        new_icmp_hdr->icmp_type = icmp_type;
-        new_icmp_hdr->icmp_code = icmp_code;
-        new_icmp_hdr->unused = 0;
-        memcpy(new_icmp_hdr->data, ip_hdr, ICMP_DATA_SIZE);
-        
-        new_icmp_hdr->icmp_sum = 0;
-        new_icmp_hdr->icmp_sum = cksum(new_icmp_hdr, sizeof(sr_icmp_t3_hdr_t));
-        
-        /* print_hdrs(buf, new_len); */
-        sr_lookup_and_send(sr, buf, new_len, oiface, rt->gw.s_addr);
-        free(buf);
+    } else{
+      fprintf(stderr, "unknown state in icmp ");
+      return;
     }
 } /* -- sr_send_icmp -- */
 
