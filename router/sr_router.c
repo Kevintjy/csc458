@@ -252,7 +252,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         icmp_hdr->icmp_sum = cksum(icmp_hdr, ntohs(ip_hdr->ip_len) - (ip_hdr->ip_hl * 4));
        
         sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
-    } else if (icmp_type == 3 || icmp_type == 11) {
+    } else if (icmp_type == 3) {
        /* malloc space for new response */
        printf("this is 3");
         uint8_t *buf = malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
