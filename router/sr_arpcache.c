@@ -11,22 +11,6 @@
 #include "sr_if.h"
 #include "sr_protocol.h"
 
-/* 
-  This function gets called every second. For each request sent out, we keep
-  checking whether we should resend an request or destroy the arp request.
-  See the comments in the header file for an idea of what it should look like.
-*/
-void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
-    struct sr_arpreq *req = sr->cache.requests;
-    while (req)
-    {
-        /* save next_req since sr_handle_arpreq will free req*/
-        struct sr_arpreq *next_req = req->next;
-        sr_handle_arpreq(sr, req);
-        req = next_req;
-    }
-}
-
 void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req)
 {
     if (difftime(time(NULL), req->sent) > 1.0) {
@@ -70,6 +54,23 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req)
         }
     }
 }
+
+/* 
+  This function gets called every second. For each request sent out, we keep
+  checking whether we should resend an request or destroy the arp request.
+  See the comments in the header file for an idea of what it should look like.
+*/
+void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
+    struct sr_arpreq *req = sr->cache.requests;
+    while (req)
+    {
+        /* save next_req since sr_handle_arpreq will free req*/
+        struct sr_arpreq *next_req = req->next;
+        sr_handle_arpreq(sr, req);
+        req = next_req;
+    }
+}
+
 
 /* You should not need to touch the rest of this code. */
 
