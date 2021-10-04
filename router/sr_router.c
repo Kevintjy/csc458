@@ -259,12 +259,12 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         sr_ip_hdr_t *ip_response = (sr_ip_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
         sr_icmp_t3_hdr_t *icmp_response = (sr_icmp_t3_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
         
-        /* ethernet header */
+        /* set created eth response */
         memset(eth_response->ether_dhost, 0, ETHER_ADDR_LEN);
         memset(eth_response->ether_shost, 0, ETHER_ADDR_LEN);
         eth_response->ether_type = htons(ethertype_ip);
         
-        /* ip header */
+        /* set created ip response */
         ip_response->ip_v = 4;
         ip_response->ip_hl = sizeof(sr_ip_hdr_t) / 4;
         ip_response->ip_tos = 0;
@@ -279,16 +279,15 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         ip_response->ip_sum = 0;
         ip_response->ip_sum = cksum(ip_response, sizeof(sr_ip_hdr_t));
         
-        /* icmp header */
+        /* set created icmp response */
         icmp_response->icmp_type = icmp_type;
         icmp_response->icmp_code = icmp_code;
         icmp_response->unused = 0;
-        memcpy(icmp_response->data, ip_hdr, ICMP_DATA_SIZE);
-        
+        icmp_response->next_mtu = 0;
         icmp_response->icmp_sum = 0;
+        memcpy(icmp_response->data, ip_hdr, ICMP_DATA_SIZE);
         icmp_response->icmp_sum = cksum(icmp_response, sizeof(sr_icmp_t3_hdr_t));
         
-        /* print_hdrs(buf, new_len); */
         sr_lookup_and_send(sr, buf, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t), oiface, rt->gw.s_addr);
         free(buf);
     }
