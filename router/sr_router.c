@@ -23,12 +23,6 @@
 #include "sr_arpcache.h"
 #include "sr_utils.h"
 
-struct sr_if *sr_get_interface_from_ip(struct sr_instance *sr, uint32_t ip_nbo);
-/* static void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t icmp_type, uint8_t icmp_code);
-
-static void sr_lookup_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *oiface, uint32_t ip);
-static void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *iface); */
-
 /*---------------------------------------------------------------------
  * Method: sr_init(void)
  * Scope:  Global
