@@ -186,11 +186,7 @@ void sr_handlepacket(struct sr_instance* sr,
     }
 }
 
-void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t icmp_type, uint8_t icmp_code)
-{
-    assert(sr);
-    assert(packet);
-    
+void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t icmp_type, uint8_t icmp_code){
     sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
     sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
     sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
@@ -198,7 +194,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
 
     /* get lontgest prefix */
     struct sr_rt* rt_walker = sr->routing_table;
-    uint32_t max_mask = 0;
+    uint32_t max_mask = 0; /* max match */
     uint32_t mask;
     uint32_t dest;
     uint32_t temp;
@@ -209,7 +205,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
       dest = rt_walker->dest.s_addr;
       temp = ip_hdr->ip_src & mask;
       dest = dest & mask;
-      if(temp == dest && mask >= max_mask){
+      if(temp == dest && mask >= max_mask){ /* update max match */
         rt = rt_walker;
         max_mask = mask;
       }
@@ -224,11 +220,12 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
     
     struct sr_if *outgoing_interface = sr_get_interface(sr, rt->interface);
     
-    if (icmp_type == 0) {
+    if (icmp_type == 0) { /* echo reply */
         
         memset(eth_hdr->ether_dhost, 0, ETHER_ADDR_LEN);
         memset(eth_hdr->ether_shost, 0, ETHER_ADDR_LEN);
         
+        /* swap source ip and destination ip */
         uint32_t tmp = ip_hdr->ip_src;
         ip_hdr->ip_src = ip_hdr->ip_dst;
         ip_hdr->ip_dst = tmp;
@@ -240,7 +237,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         icmp_hdr->icmp_sum = cksum(icmp_hdr, ntohs(ip_hdr->ip_len) - (ip_hdr->ip_hl * 4));
        
         sr_lookup_arpcache_and_send(sr, packet, len, outgoing_interface, rt->gw.s_addr);
-    }else if (icmp_type == 11 || icmp_type == 3) {
+    }else if (icmp_type == 11 || icmp_type == 3) { /* unreacbabel or time exceed */
         uint8_t *buf = (uint8_t *)malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
         
         sr_ethernet_hdr_t *eth_response = (sr_ethernet_hdr_t *)buf;
@@ -281,9 +278,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
     }
 } 
 
-void sr_lookup_arpcache_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *outgoing_interface, uint32_t ip)
-{
-    
+void sr_lookup_arpcache_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *outgoing_interface, uint32_t ip){
     struct sr_arpentry *entry = sr_arpcache_lookup(&(sr->cache), ip);
     
     if (entry) { /* we found it on arpcache, simply send it*/
@@ -304,8 +299,7 @@ void sr_lookup_arpcache_and_send(struct sr_instance *sr, uint8_t *packet, unsign
 
 
 
-void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *iface)
-{
+void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *iface){
     /* check length */
     if (len < sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t)) {
         fprintf(stderr, "arp packet has insufficient length\n");

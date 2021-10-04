@@ -17,12 +17,12 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req)
         if (req->times_sent >= 5) {
             struct sr_packet* pkt = req->packets;
             
-            while (pkt) {
+            while (pkt) { /* Destination host unreachable, send icmp message */
               sr_send_icmp(sr, pkt->buf, pkt->len, 3, 1);
               pkt = pkt->next;
             }
             sr_arpreq_destroy(&(sr->cache), req);
-        } else {
+        } else { /* send arp request */
             struct sr_if *oiface = sr_get_interface(sr, req->packets->iface);
             
             uint8_t *buf = (uint8_t *)malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
@@ -62,8 +62,7 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req)
 */
 void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
     struct sr_arpreq *req = sr->cache.requests;
-    while (req)
-    {
+    while (req){ /* handle the arp request one by one*/
         /* save next_req since sr_handle_arpreq will free req*/
         struct sr_arpreq *next_req = req->next;
         sr_handle_arpreq(sr, req);
