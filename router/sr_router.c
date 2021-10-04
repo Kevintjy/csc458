@@ -29,7 +29,6 @@ static void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int l
 
 static void sr_lookup_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *oiface, uint32_t ip);
 static void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *iface);
-static void sr_send_arp_request(struct sr_instance *sr, struct sr_if *oiface, uint32_t tip);
 
 /*---------------------------------------------------------------------
  * Method: sr_init(void)
@@ -291,13 +290,10 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         sr_lookup_and_send(sr, buf, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t), oiface, rt->gw.s_addr);
         free(buf);
     }
-} /* -- sr_send_icmp -- */
+} 
 
 void sr_lookup_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *oiface, uint32_t ip)
 {
-    assert(sr);
-    assert(packet);
-    assert(oiface);
     
     struct sr_arpentry *entry = sr_arpcache_lookup(&(sr->cache), ip);
     
@@ -315,33 +311,18 @@ void sr_lookup_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int le
         
         sr_handle_arpreq(sr, req);
     }
-} /* -- sr_lookup_and_send -- */
+} 
 
 void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req)
 {
-    assert(sr);
-    assert(req);
-    
     if (difftime(time(NULL), req->sent) >= 1.0) {
         if (req->times_sent >= 5) {
-            struct sr_packet *pkt = NULL;
-            sr_ethernet_hdr_t *eth_hdr = NULL;
-            struct sr_if *iface = NULL;
-            
-            pkt = req->packets;
+            struct sr_packet* pkt = req->packets;
             
             while (pkt) {
-                eth_hdr = (sr_ethernet_hdr_t *)(pkt->buf);
-                iface = sr_get_interface_from_addr(sr, eth_hdr->ether_dhost);
-                
-                /* do not send an ICMP message for an ICMP message */
-                if (iface) {
-                    sr_send_icmp(sr, pkt->buf, pkt->len, 3, 1);
-                }
-                
-                pkt = pkt->next;
+              sr_send_icmp(sr, pkt->buf, pkt->len, 3, 1);
+              pkt = pkt->next;
             }
-            
             sr_arpreq_destroy(&(sr->cache), req);
         } else {
             struct sr_if *oiface = sr_get_interface(sr, req->packets->iface);
@@ -356,12 +337,7 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req)
 
 void sr_send_arp_request(struct sr_instance *sr, struct sr_if *oiface, uint32_t tip)
 {
-    assert(sr);
-    assert(oiface);
-    
-    unsigned int len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
-    uint8_t *buf = (uint8_t *)malloc(len);
-    assert(buf);
+    uint8_t *buf = (uint8_t *)malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
     
     sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)buf;
     sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
@@ -381,11 +357,10 @@ void sr_send_arp_request(struct sr_instance *sr, struct sr_if *oiface, uint32_t 
     arp_hdr->ar_sip = oiface->ip;
     memset(arp_hdr->ar_tha, 0, ETHER_ADDR_LEN);
     arp_hdr->ar_tip = tip;
-    
-    /* print_hdrs(buf, len); */
-    sr_send_packet(sr, buf, len, oiface->name);
+  
+    sr_send_packet(sr, buf, sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t), oiface->name);
     free(buf);
-} /* -- sr_send_arp_request -- */
+} 
 
 void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *iface)
 {
@@ -401,14 +376,13 @@ void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, st
     sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
     sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
     struct sr_if *dest_interface = sr_get_interface_from_ip(sr, arp_hdr->ar_tip);
-    
     if (ntohs(arp_hdr->ar_op) == arp_op_request) {
       if (dest_interface){
-        /* ethernet header */
+        /* modify ethernet header */
         memcpy(eth_hdr->ether_dhost, eth_hdr->ether_shost, ETHER_ADDR_LEN);
         memcpy(eth_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN);
         
-        /* arp header */
+        /* modify arp header */
         arp_hdr->ar_op = htons(arp_op_reply);
         memcpy(arp_hdr->ar_sha, dest_interface->addr, ETHER_ADDR_LEN);
         memcpy(arp_hdr->ar_tha, arp_hdr->ar_sha, ETHER_ADDR_LEN);
