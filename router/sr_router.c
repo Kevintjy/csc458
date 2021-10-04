@@ -23,7 +23,6 @@
 #include "sr_arpcache.h"
 #include "sr_utils.h"
 
-struct sr_if *sr_get_interface_from_addr(struct sr_instance *sr, const unsigned char *addr);
 struct sr_if *sr_get_interface_from_ip(struct sr_instance *sr, uint32_t ip_nbo);
 static void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t icmp_type, uint8_t icmp_code);
 
@@ -147,7 +146,7 @@ void sr_handlepacket(struct sr_instance* sr,
         
         /* get lontgest prefix */
         struct sr_rt* rt_walker = sr->routing_table;
-        uint32_t max_mask = 0;
+        uint32_t max_mask = 0; /* max match */
         uint32_t mask;
         uint32_t dest;
         uint32_t temp;
@@ -158,7 +157,7 @@ void sr_handlepacket(struct sr_instance* sr,
           dest = rt_walker->dest.s_addr;
           temp = ip_hdr->ip_dst & mask;
           dest = dest & mask;
-          if(temp == dest && mask >= max_mask){
+          if(temp == dest && mask >= max_mask){ /* update max match */
             rt = rt_walker;
             max_mask = mask;
           }
@@ -313,60 +312,7 @@ void sr_lookup_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int le
     }
 } 
 
-void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req)
-{
-    
-    if (difftime(time(NULL), req->sent) >= 1.0) {
-        if (req->times_sent >= 5) {
-            struct sr_packet* pkt = req->packets;
-            
-            while (pkt) {
-              sr_send_icmp(sr, pkt->buf, pkt->len, 3, 1);
-              pkt = pkt->next;
-            }
-            sr_arpreq_destroy(&(sr->cache), req);
-        } else {
-            struct sr_if *oiface = sr_get_interface(sr, req->packets->iface);
-            
-            sr_send_arp_request(sr, oiface, req->ip);
-            
-            req->sent = time(NULL);
-            req->times_sent++;
-        }
-    }
-}
 
-void sr_send_arp_request(struct sr_instance *sr, struct sr_if *oiface, uint32_t tip)
-{
-    assert(sr);
-    assert(oiface);
-    
-    unsigned int len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
-    uint8_t *buf = (uint8_t *)malloc(len);
-    assert(buf);
-    
-    sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)buf;
-    sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
-    
-    /* ethernet header */
-    memset(eth_hdr->ether_dhost, 255, ETHER_ADDR_LEN);
-    memcpy(eth_hdr->ether_shost, oiface->addr, ETHER_ADDR_LEN);
-    eth_hdr->ether_type = htons(ethertype_arp);
-    
-    /* arp header */
-    arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
-    arp_hdr->ar_pro = htons(ethertype_ip);
-    arp_hdr->ar_hln = ETHER_ADDR_LEN;
-    arp_hdr->ar_pln = sizeof(uint32_t);
-    arp_hdr->ar_op = htons(arp_op_request);
-    memcpy(arp_hdr->ar_sha, oiface->addr, ETHER_ADDR_LEN);
-    arp_hdr->ar_sip = oiface->ip;
-    memset(arp_hdr->ar_tha, 0, ETHER_ADDR_LEN);
-    arp_hdr->ar_tip = tip;
-  
-    sr_send_packet(sr, buf, len, oiface->name);
-    free(buf);
-} 
 
 void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *iface)
 {
@@ -424,24 +370,4 @@ void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, st
     }
 } 
 
-
-struct sr_if *sr_get_interface_from_addr(struct sr_instance *sr, const unsigned char *addr)
-{
-    struct sr_if *if_walker = 0;
-    
-    assert(addr);
-    assert(sr);
-    
-    if_walker = sr->if_list;
-    
-    while (if_walker) {
-        if (!memcmp(if_walker->addr, addr, ETHER_ADDR_LEN)) {
-            return if_walker;
-        }
-        
-        if_walker = if_walker->next;
-    }
-    
-    return 0;
-} /* -- sr_get_interface_from_addr -- */
 
