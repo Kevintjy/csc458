@@ -229,7 +229,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
     }
     
     if (!rt) {
-        fprintf(stderr, "no interface found")
+        fprintf(stderr, "no interface found");
         return;
     }
     
@@ -243,7 +243,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         
         uint32_t tmp = ip_hdr->ip_src;
         ip_hdr->ip_src = ip_hdr->ip_dst;
-        ip_hdr->ip_dst = ip_dst;
+        ip_hdr->ip_dst = tmp;
         
         
         icmp_hdr->icmp_type = 0;
