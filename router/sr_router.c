@@ -219,7 +219,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
     while (rt_walker != NULL) {
       mask = rt_walker->mask.s_addr;
       dest = rt_walker->dest.s_addr;
-      temp = ip_hdr->ip_dst & mask;
+      temp = ip_hdr->ip_src & mask;
       dest = dest & mask;
       if(temp == dest && mask >= max_mask){
         rt = rt_walker;
