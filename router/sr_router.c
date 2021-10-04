@@ -252,7 +252,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         icmp_hdr->icmp_sum = cksum(icmp_hdr, ntohs(ip_hdr->ip_len) - (ip_hdr->ip_hl * 4));
        
         sr_lookup_and_send(sr, packet, len, oiface, rt->gw.s_addr);
-    } else if (icmp_type == 3) {
+    } else if (icmp_type == 3 || icmp_type == 11) {
        /* malloc space for new response */
        printf("this is 3");
         uint8_t *buf = malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
@@ -267,13 +267,14 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         ip_res_hdr->ip_v = 4; /* IPv4 */
         ip_res_hdr->ip_hl = sizeof(sr_ip_hdr_t) / 4;
         ip_res_hdr->ip_tos = 0;
-        ip_res_hdr->ip_id = 0;
-        ip_res_hdr->ip_off = IP_DF;
+        ip_res_hdr->ip_id = htons(0);
+        ip_res_hdr->ip_off = htons(IP_DF);
         ip_res_hdr->ip_ttl = 100;
         ip_res_hdr->ip_p = ip_protocol_icmp;
         ip_res_hdr->ip_src = (icmp_code == 0 || icmp_code == 1) ? oiface->ip : ip_hdr->ip_dst;
         ip_res_hdr->ip_dst = ip_hdr->ip_src;
         ip_res_hdr->ip_len = sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+
         ip_res_hdr->ip_sum = 0;
         ip_res_hdr->ip_sum = cksum(ip_hdr, sizeof(sr_ip_hdr_t));
         
@@ -281,7 +282,6 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         icmp_res_hdr->icmp_type = icmp_type;
         icmp_res_hdr->icmp_code = icmp_code;
         icmp_res_hdr->icmp_sum = 0;
-        icmp_res_hdr->next_mtu = 0;
         icmp_res_hdr->unused = 0;
         memcpy(icmp_res_hdr->data, ip_hdr, ICMP_DATA_SIZE);
         icmp_res_hdr->icmp_sum = cksum(icmp_res_hdr, sizeof(sr_icmp_t3_hdr_t));
@@ -289,7 +289,6 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         sr_lookup_and_send(sr, buf, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t), oiface, rt->gw.s_addr);
         free(buf);
     } else if (icmp_type == 11) {
-      printf("this is 11");
         unsigned int new_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
         uint8_t *buf = (uint8_t *)malloc(new_len);
         assert(buf);
