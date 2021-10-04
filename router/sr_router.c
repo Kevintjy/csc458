@@ -101,8 +101,6 @@ void sr_handlepacket(struct sr_instance* sr,
         fprintf(stderr, "Ethernet header is too short\n");
         return;
     }
-    
-    sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
     struct sr_if *iface = sr_get_interface(sr, interface);
     
     if (ethertype(packet) == ethertype_ip) { /* handle IP packet*/
