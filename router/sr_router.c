@@ -160,7 +160,7 @@ void sr_handlepacket(struct sr_instance* sr,
             sr_send_icmp(sr, packet, len, 3, 0);
             return;
         }
-        sr_lookup_and_send(sr, packet, len, sr_get_interface(sr, rt->interface), rt->gw.s_addr);
+        sr_lookup_arpcache_and_send(sr, packet, len, sr_get_interface(sr, rt->interface), rt->gw.s_addr);
       } else { /*  find the destination interface */
           sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
           if (ip_hdr->ip_p == ip_protocol_icmp) {
@@ -239,7 +239,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         icmp_hdr->icmp_sum = 0;
         icmp_hdr->icmp_sum = cksum(icmp_hdr, ntohs(ip_hdr->ip_len) - (ip_hdr->ip_hl * 4));
        
-        sr_lookup_and_send(sr, packet, len, outgoing_interface, rt->gw.s_addr);
+        sr_lookup_arpcache_and_send(sr, packet, len, outgoing_interface, rt->gw.s_addr);
     }else if (icmp_type == 11 || icmp_type == 3) {
         uint8_t *buf = (uint8_t *)malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
         
@@ -276,17 +276,17 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         memcpy(icmp_response->data, ip_hdr, ICMP_DATA_SIZE);
         icmp_response->icmp_sum = cksum(icmp_response, sizeof(sr_icmp_t3_hdr_t));
         
-        sr_lookup_and_send(sr, buf, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t), outgoing_interface, rt->gw.s_addr);
+        sr_lookup_arpcache_and_send(sr, buf, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t), outgoing_interface, rt->gw.s_addr);
         free(buf);
     }
 } 
 
-void sr_lookup_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *outgoing_interface, uint32_t ip)
+void sr_lookup_arpcache_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *outgoing_interface, uint32_t ip)
 {
     
     struct sr_arpentry *entry = sr_arpcache_lookup(&(sr->cache), ip);
     
-    if (entry) {
+    if (entry) { /* we found it on arpcache, simply send it*/
         sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
         
         memcpy(eth_hdr->ether_dhost, entry->mac, ETHER_ADDR_LEN);
@@ -295,7 +295,7 @@ void sr_lookup_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int le
         sr_send_packet(sr, packet, len, outgoing_interface->name);
         
         free(entry);
-    } else {
+    } else { /* not found entry, send it in queue and handle it */
         struct sr_arpreq *req = sr_arpcache_queuereq(&(sr->cache), ip, packet, len, outgoing_interface->name);
         
         sr_handle_arpreq(sr, req);
@@ -306,10 +306,6 @@ void sr_lookup_and_send(struct sr_instance *sr, uint8_t *packet, unsigned int le
 
 void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *iface)
 {
-    assert(sr);
-    assert(packet);
-    assert(iface);
-    
     /* check length */
     if (len < sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t)) {
         fprintf(stderr, "arp packet has insufficient length\n");
@@ -337,11 +333,12 @@ void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, st
       }
     } else if (ntohs(arp_hdr->ar_op) == arp_op_reply) {
         if (dest_interface){
+          /* add it to arpcache */
           struct sr_arpreq *req = sr_arpcache_insert(&(sr->cache), arp_hdr->ar_sha, arp_hdr->ar_sip);
           
           if (req) {
               struct sr_packet * pkt = req->packets;
-              
+              /* sequencely send the packet */
               while (pkt) {
                   struct sr_if * outgoing_interface = sr_get_interface(sr, pkt->iface);
                   sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)(pkt->buf);
@@ -353,7 +350,7 @@ void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, st
                   
                   pkt = pkt->next;
               }
-              
+              /* finally destroy the arpreq */
               sr_arpreq_destroy(&(sr->cache), req);
           }
       }
