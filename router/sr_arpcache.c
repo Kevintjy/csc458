@@ -17,8 +17,61 @@
   See the comments in the header file for an idea of what it should look like.
 */
 void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
-    /* Fill this in */
+    struct sr_arpreq *req = sr->cache.requests;
+    while (req)
+    {
+        /* save next_req because sr_handle_arpreq would free req*/
+        struct sr_arpreq *next_req = req->next;
+        sr_handle_arpreq(sr, req);
+        req = next_req;
+    }
 }
+
+void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req)
+{
+    if (difftime(time(NULL), req->sent) >= 1.0) {
+        if (req->times_sent >= 5) {
+            struct sr_packet* pkt = req->packets;
+            
+            while (pkt) {
+              sr_send_icmp(sr, pkt->buf, pkt->len, 3, 1);
+              pkt = pkt->next;
+            }
+            sr_arpreq_destroy(&(sr->cache), req);
+        } else {
+            struct sr_if *oiface = sr_get_interface(sr, req->packets->iface);
+            
+            /* send the arp request */
+            uint8_t *buf = (uint8_t *)malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
+    
+            sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)buf;
+            sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
+            
+            /* ethernet header */
+            memset(eth_hdr->ether_dhost, 255, ETHER_ADDR_LEN);
+            memcpy(eth_hdr->ether_shost, oiface->addr, ETHER_ADDR_LEN);
+            eth_hdr->ether_type = htons(ethertype_arp);
+            
+            /* arp header */
+            arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
+            arp_hdr->ar_pro = htons(ethertype_ip);
+            arp_hdr->ar_hln = ETHER_ADDR_LEN;
+            arp_hdr->ar_pln = sizeof(uint32_t);
+            arp_hdr->ar_op = htons(arp_op_request);
+            memcpy(arp_hdr->ar_sha, oiface->addr, ETHER_ADDR_LEN);
+            arp_hdr->ar_sip = oiface->ip;
+            memset(arp_hdr->ar_tha, 0, ETHER_ADDR_LEN);
+            arp_hdr->ar_tip = req->ip;
+            sr_send_packet(sr, buf, sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t), oiface->name);
+            free(buf);
+            
+            /* add time_sent */
+            req->sent = time(NULL);
+            req->times_sent++;
+        }
+    }
+
+
 
 /* You should not need to touch the rest of this code. */
 
