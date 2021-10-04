@@ -268,13 +268,14 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         ip_response->ip_v = 4;
         ip_response->ip_hl = sizeof(sr_ip_hdr_t) / 4;
         ip_response->ip_tos = 0;
-        ip_response->ip_p = ip_protocol_icmp;
-        ip_response->ip_id = 0;
-        ip_response->ip_off = IP_DF;
+        ip_response->ip_len = sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
+        ip_response->ip_id = htons(0);
+        ip_response->ip_off = htons(IP_DF);
         ip_response->ip_ttl = 64;
+        ip_response->ip_p = ip_protocol_icmp;
         ip_response->ip_src = (icmp_code == 0 || icmp_code == 1) ? oiface->ip : ip_hdr->ip_dst;
         ip_response->ip_dst = ip_hdr->ip_src;
-        ip_response->ip_len = sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+        
         ip_response->ip_sum = 0;
         ip_response->ip_sum = cksum(ip_response, sizeof(sr_ip_hdr_t));
         
@@ -282,9 +283,9 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         icmp_response->icmp_type = icmp_type;
         icmp_response->icmp_code = icmp_code;
         icmp_response->unused = 0;
-        icmp_response->next_mtu = 0;
-        icmp_response->icmp_sum = 0;
         memcpy(icmp_response->data, ip_hdr, ICMP_DATA_SIZE);
+        
+        icmp_response->icmp_sum = 0;
         icmp_response->icmp_sum = cksum(icmp_response, sizeof(sr_icmp_t3_hdr_t));
         
         /* print_hdrs(buf, new_len); */
