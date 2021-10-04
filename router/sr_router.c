@@ -288,7 +288,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         sr_lookup_and_send(sr, buf, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t), oiface, rt->gw.s_addr);
         free(buf);
     } else{
-      fprintf(stderr, "get into error state\n")
+      fprintf(stderr, "get into error state\n");
     }
 } /* -- sr_send_icmp -- */
 
