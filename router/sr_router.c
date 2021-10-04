@@ -268,7 +268,7 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t *packet, unsigned int len, uin
         ip_response->ip_v = 4;
         ip_response->ip_hl = sizeof(sr_ip_hdr_t) / 4;
         ip_response->ip_tos = 0;
-        ip_response->ip_len = sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+        ip_response->ip_len = htons(sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
         ip_response->ip_id = htons(0);
         ip_response->ip_off = htons(IP_DF);
         ip_response->ip_ttl = 64;
