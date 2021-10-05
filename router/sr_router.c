@@ -173,10 +173,8 @@ void sr_handlepacket(struct sr_instance* sr,
               sr_send_icmp(sr, packet, len, 0, 0);
             }
             /* this is a tcp or udp */
-          } else if (ip_hdr->ip_p == 6 || ip_hdr->ip_p == 11) {
+          } else {
               sr_send_icmp(sr, packet, len, 3, 3);
-          }else{
-            fprintf(stderr, "reach unknown state");
           }
       }
     } else if (ethertype(packet) == ethertype_arp) { /* handle ARP packet*/
