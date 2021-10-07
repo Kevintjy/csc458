@@ -318,9 +318,9 @@ void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, st
         
         /* modify arp header */
         arp_res->ar_op = htons(arp_op_reply);
-        memcpy(arp_res->ar_sha, dest_interface->addr, ETHER_ADDR_LEN);
+        memcpy(arp_res->ar_sha, iface->addr, ETHER_ADDR_LEN);
         memcpy(arp_res->ar_tha, arp_hdr->ar_sha, ETHER_ADDR_LEN);
-        arp_res->ar_sip = dest_interface->ip;
+        arp_res->ar_sip = iface->ip;
         arp_res->ar_tip = arp_hdr->ar_sip;
 
         /* send the request */
