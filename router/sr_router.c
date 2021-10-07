@@ -309,6 +309,7 @@ void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, st
     if (ntohs(arp_hdr->ar_op) == arp_op_request) {
       if (dest_interface){
         uint8_t *buf = malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
+        memcpy(buf, packet, len);
         sr_ethernet_hdr_t *eth_res = (sr_ethernet_hdr_t *)buf;
         sr_arp_hdr_t *arp_res = (sr_arp_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
         /* modify ethernet header */
