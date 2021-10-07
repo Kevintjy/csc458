@@ -308,20 +308,24 @@ void sr_handle_arp(struct sr_instance *sr, uint8_t *packet, unsigned int len, st
     struct sr_if *dest_interface = sr_get_interface_from_ip(sr, arp_hdr->ar_tip);
     if (ntohs(arp_hdr->ar_op) == arp_op_request) {
       if (dest_interface){
+        sr_ethernet_hdr_t *buf = (sr_ethernet_hdr_t *)malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
+        sr_ethernet_hdr_t *eth_res = (sr_ethernet_hdr_t *)buf;
+        sr_arp_hdr_t *arp_res = (sr_arp_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
         /* modify ethernet header */
-        memcpy(eth_hdr->ether_dhost, eth_hdr->ether_shost, ETHER_ADDR_LEN);
-        memcpy(eth_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN);
+        memcpy(eth_res->ether_dhost, eth_hdr->ether_shost, ETHER_ADDR_LEN);
+        memcpy(eth_res->ether_shost, iface->addr, ETHER_ADDR_LEN);
+        eth_res->ether_type = htons(ethertype_arp);
         
         /* modify arp header */
-        arp_hdr->ar_op = htons(arp_op_reply);
-        memcpy(arp_hdr->ar_sha, dest_interface->addr, ETHER_ADDR_LEN);
-        memcpy(arp_hdr->ar_tha, arp_hdr->ar_sha, ETHER_ADDR_LEN);
-        uint32_t temp = arp_hdr->ar_sip;
-        arp_hdr->ar_sip = dest_interface->ip;
-        arp_hdr->ar_tip = temp;
+        arp_res->ar_op = htons(arp_op_reply);
+        memcpy(arp_res->ar_sha, dest_interface->addr, ETHER_ADDR_LEN);
+        memcpy(arp_res->ar_tha, arp_hdr->ar_sha, ETHER_ADDR_LEN);
+        arp_res->ar_sip = dest_interface->ip;
+        arp_res->ar_tip = arp_hdr->ar_sip;
 
         /* send the request */
-        sr_send_packet(sr, packet, len, iface->name);
+        sr_send_packet(sr, buf, len, iface->name);
+        free(buf);
       }
     } else if (ntohs(arp_hdr->ar_op) == arp_op_reply) {
         if (dest_interface){
