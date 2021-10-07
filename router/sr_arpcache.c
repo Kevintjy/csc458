@@ -18,8 +18,20 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req)
             struct sr_packet* pkt = req->packets;
             
             while (pkt) { /* Destination host unreachable, send icmp message */
-              sr_send_icmp(sr, pkt->buf, pkt->len, 3, 1);
-              pkt = pkt->next;
+                struct sr_if *iface = NULL;
+                sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)(pkt->buf);
+                struct sr_if *if_walker = sr->if_list;
+                while (if_walker) {
+                    if (!memcmp(if_walker->addr, eth_hdr->ether_dhost, ETHER_ADDR_LEN)) {
+                        iface = if_walker;
+                        break;
+                    }
+                    if_walker = if_walker->next;
+                }
+                if (iface){
+                    sr_send_icmp(sr, pkt->buf, pkt->len, 3, 1);
+                }
+                pkt = pkt->next;
             }
             sr_arpreq_destroy(&(sr->cache), req);
         } else { /* send arp request */
