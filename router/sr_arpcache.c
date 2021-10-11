@@ -30,12 +30,12 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req)
             sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)buf;
             sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(buf + sizeof(sr_ethernet_hdr_t));
             
-            /* ethernet header */
+            /* construct ethernet header */
             memset(eth_hdr->ether_dhost, 255, ETHER_ADDR_LEN);
             memcpy(eth_hdr->ether_shost, oiface->addr, ETHER_ADDR_LEN);
             eth_hdr->ether_type = htons(ethertype_arp);
             
-            /* arp header */
+            /* construct arp header */
             arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
             arp_hdr->ar_pro = htons(ethertype_ip);
             arp_hdr->ar_hln = ETHER_ADDR_LEN;
